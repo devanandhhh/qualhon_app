@@ -1,9 +1,15 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:qualhon_app/core/colors.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  const HomeScreen(
+      {super.key, required this.image, required this.selectedFilter});
+
+  final Future<Uint8List?> image; // The image data
+  final ColorFilter selectedFilter; // The selected filter
 
   AppBar buildAppbar(BuildContext context) {
     return AppBar(
@@ -51,9 +57,23 @@ class HomeScreen extends StatelessWidget {
           ),
           Gap(10),
           //section 2---
-          Container(
-            height: 297,
-            color: kCustomGreen,
+          FutureBuilder<Uint8List?>(
+            future: image,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasData) {
+                return ColorFiltered(
+                  colorFilter: selectedFilter, // Apply the selected filter
+                  child: SizedBox(
+                      height: 297,
+                      width: double.infinity,
+                      child: Image.memory(snapshot.data!, fit: BoxFit.cover)),
+                );
+              }
+              return Center(child: Text("No image selected"));
+            },
           ),
           Container(
             height: 29,
@@ -64,20 +84,23 @@ class HomeScreen extends StatelessWidget {
                 Text(
                   "11 hours ago",
                   style: TextStyle(color: Colors.grey),
-                ),Gap(90),
+                ),
+                Gap(90),
                 Row(
                   children: [
                     CircleAvatar(
                       radius: 4,
                       backgroundColor: Colors.grey,
-                    ),Gap(5),
+                    ),
+                    Gap(5),
                     Container(
                       height: 7,
                       width: 20,
                       decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(7),
                           color: kMainColor),
-                    ),Gap(5),
+                    ),
+                    Gap(5),
                     CircleAvatar(
                       radius: 4,
                       backgroundColor: Colors.grey,

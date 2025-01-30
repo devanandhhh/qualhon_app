@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
-import 'package:qualhon_app/presentation/pages/demo.dart';
 import 'package:qualhon_app/presentation/pages/post_screen/post_screen.dart';
 
-import 'widget/custom_buttom.dart';
+import '../../widget/custom_buttom.dart';
 
 class FirstScreen extends StatelessWidget {
   const FirstScreen({super.key});
@@ -20,19 +19,7 @@ class FirstScreen extends StatelessWidget {
           ),
           Column(
             children: [
-              Center(
-                child: InkWell(
-                  onTap: () {
-                    //Navigate to post screen-
-                    Navigator.push(context,
-                        MaterialPageRoute(builder: (ctx) => PageDemo()));
-                  },
-                  // Start button here-
-                  child: CustomButton(width: 312,text: "Demo",),
-                ),
-              ),
-
-              Gap(30),
+              
                Center(
                 child: InkWell(
                   onTap: () {

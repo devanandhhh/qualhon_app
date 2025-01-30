@@ -1,66 +1,22 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:gap/gap.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:qualhon_app/core/colors.dart';
+import 'package:qualhon_app/presentation/bloc/image_picking/image_pick_bloc.dart';
 import 'package:qualhon_app/presentation/pages/filter_screen/filter_screen.dart';
+import 'package:qualhon_app/presentation/widget/custom_snakbar.dart';
 
-class PostScreen extends StatefulWidget {
-  const PostScreen({super.key});
+// ignore: must_be_immutable
+class PostScreen extends StatelessWidget {
+  PostScreen({super.key});
 
-  @override
-  State<PostScreen> createState() => _PostScreenState();
-}
-
-class _PostScreenState extends State<PostScreen> {
   List<dynamic> images = [];
-  bool isLoading = true;
 
   Uint8List? selectedImage;
-  void selectImage(dynamic image) async {
-    final Uint8List? imageData =
-        await image.thumbnailDataWithSize(ThumbnailSize(200, 200));
-    if (imageData != null) {
-      setState(() {
-        selectedImage = imageData;
-      });
-    }
-  }
-
-  //permission ======
-  @override
-  void initState() {
-    super.initState();
-    requestPermission();
-  }
-
-// Request gallery permission
-  Future<void> requestPermission() async {
-    final PermissionState status = await PhotoManager.requestPermissionExtend();
-
-    if (status.isAuth) {
-      loadImages(); // Load images if permission is granted
-    } else {
-      PhotoManager.openSetting();
-      //print("Permission Denied!");
-    }
-  }
-
-// Load images from the gallery
-  Future<void> loadImages() async {
-    final List<AssetPathEntity> albums =
-        await PhotoManager.getAssetPathList(type: RequestType.image);
-
-    if (albums.isNotEmpty) {
-      List<AssetEntity> media =
-          await albums[0].getAssetListPaged(page: 0, size: 100);
-      setState(() {
-        images = media;
-        isLoading = false;
-      });
-    }
-  }
+  dynamic selectedImage1;
 
   AppBar buildAppBar(BuildContext context) {
     return AppBar(
@@ -74,20 +30,31 @@ class _PostScreenState extends State<PostScreen> {
       ),
       actions: [
         TextButton(
-            onPressed: () {
-              Navigator.push(
-                  context, MaterialPageRoute(builder: (ctx) => FilterScreen()));
-            },
-            child: Text(
-              "Next",
-              style: TextStyle(color: kMainColor),
-            ))
+          onPressed: () {
+            selectedImage1 == null
+                ? ScaffoldMessenger.of(context)
+                    .showSnackBar(kSnakbar(text: "Please Select an Image"))
+                : Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (ctx) => FilterScreen(
+                        image: selectedImage1,
+                      ),
+                    ),
+                  );
+          },
+          child: Text(
+            "Next",
+            style: TextStyle(color: kMainColor),
+          ),
+        )
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    context.read<ImagePickBloc>().add(ImageLoadEvent());
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 250, 243, 243),
       appBar: buildAppBar(context),
@@ -95,15 +62,27 @@ class _PostScreenState extends State<PostScreen> {
         padding: const EdgeInsets.all(15.0),
         child: Column(
           children: [
-            Center(
-              child: Container(
-                height: 200,
-                width: 350,
-                child: selectedImage != null
-                    ? Image.memory(selectedImage!, fit: BoxFit.cover)
-                    : Center(child: Text('Select an image')),
-                color: Colors.grey[400],
-              ),
+            BlocBuilder<ImagePickBloc, ImagePickState>(
+              builder: (context, state) {
+                if (state is ImageSelectState) {
+                  return Container(
+                    height: 200,
+                    width: 350,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[400],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Image.memory(state.imageData, fit: BoxFit.cover),
+                  );
+                }
+
+                return Container(
+                  height: 200,
+                  width: 350,
+                  color: Colors.grey[400],
+                  child: Center(child: Text('Select an image')),
+                );
+              },
             ),
             Gap(10),
             //session 2-===================================================
@@ -195,35 +174,52 @@ class _PostScreenState extends State<PostScreen> {
             Gap(20),
             //4 grid view================================================
             Expanded(
-              child: GridView.builder(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  crossAxisSpacing: 2,
-                  mainAxisSpacing: 2,
-                  childAspectRatio: 1.0,
-                ),
-                itemBuilder: (context, index) {
-                  return FutureBuilder<Uint8List?>(
-                    future: Future.value(images[index]
-                        .thumbnailDataWithSize(ThumbnailSize(200, 200))),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Container(color: Colors.grey[300]);
-                      }
-                      if (snapshot.hasData) {
-                        return GestureDetector(
-                          onTap: () =>
-                              selectImage(images[index]), // Select image
-                          child:
-                              Image.memory(snapshot.data!, fit: BoxFit.cover),
+              child: BlocBuilder<ImagePickBloc, ImagePickState>(
+                builder: (context, state) {
+                  if (state is ImageLoadingState) {
+                    return Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  } else if (state is ImageLoadedState) {
+                    return GridView.builder(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 4,
+                        crossAxisSpacing: 2,
+                        mainAxisSpacing: 2,
+                        childAspectRatio: 1.0,
+                      ),
+                      itemCount: state.images.length,
+                      itemBuilder: (context, index) {
+                        return FutureBuilder<Uint8List?>(
+                          future: state.images[index]
+                              .thumbnailDataWithSize(ThumbnailSize(200, 200)),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return Container(color: Colors.grey[300]);
+                            }
+                            if (snapshot.hasData) {
+                              return GestureDetector(
+                                onTap: () {
+                                  selectedImage1 = state.images[index];
+                                  context.read<ImagePickBloc>().add(
+                                      ImageSelectEvent(
+                                          image: state.images[index]));
+                                },
+                                child: Image.memory(snapshot.data!,
+                                    fit: BoxFit.cover),
+                              );
+                            }
+                            return Container(color: Colors.grey[300]);
+                          },
                         );
-                      } else {
-                        return Container(color: Colors.grey[300]);
-                      }
-                    },
-                  );
+                      },
+                    );
+                  } else if (state is ImageErrorState) {
+                    return Center(child: Text(state.message));
+                  }
+                  return SizedBox.shrink();
                 },
-                itemCount: images.isNotEmpty ? images.length : 0,
               ),
             ),
             Gap(10),
@@ -246,20 +242,22 @@ class _PostScreenState extends State<PostScreen> {
                             color: kMainLite,
                             borderRadius: BorderRadius.circular(5)),
                         child: Center(
-                            child: Text(
-                          "Post",
-                          style: TextStyle(color: kMainColor, fontSize: 12),
-                        )),
+                          child: Text(
+                            "Post",
+                            style: TextStyle(color: kMainColor, fontSize: 12),
+                          ),
+                        ),
                       ),
                       Container(
                         height: 19,
                         width: 35,
                         color: kWhite,
                         child: Center(
-                            child: Text(
-                          "Reel",
-                          style: TextStyle(color: kBlack, fontSize: 12),
-                        )),
+                          child: Text(
+                            "Reel",
+                            style: TextStyle(color: kBlack, fontSize: 12),
+                          ),
+                        ),
                       )
                     ],
                   ),
