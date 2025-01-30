@@ -1,10 +1,66 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
+import 'package:photo_manager/photo_manager.dart';
 import 'package:qualhon_app/core/colors.dart';
 import 'package:qualhon_app/presentation/pages/filter_screen/filter_screen.dart';
 
-class PostScreen extends StatelessWidget {
+class PostScreen extends StatefulWidget {
   const PostScreen({super.key});
+
+  @override
+  State<PostScreen> createState() => _PostScreenState();
+}
+
+class _PostScreenState extends State<PostScreen> {
+  List<dynamic> images = [];
+  bool isLoading = true;
+
+  Uint8List? selectedImage;
+  void selectImage(dynamic image) async {
+    final Uint8List? imageData =
+        await image.thumbnailDataWithSize(ThumbnailSize(200, 200));
+    if (imageData != null) {
+      setState(() {
+        selectedImage = imageData;
+      });
+    }
+  }
+
+  //permission ======
+  @override
+  void initState() {
+    super.initState();
+    requestPermission();
+  }
+
+// Request gallery permission
+  Future<void> requestPermission() async {
+    final PermissionState status = await PhotoManager.requestPermissionExtend();
+
+    if (status.isAuth) {
+      loadImages(); // Load images if permission is granted
+    } else {
+      PhotoManager.openSetting();
+      //print("Permission Denied!");
+    }
+  }
+
+// Load images from the gallery
+  Future<void> loadImages() async {
+    final List<AssetPathEntity> albums =
+        await PhotoManager.getAssetPathList(type: RequestType.image);
+
+    if (albums.isNotEmpty) {
+      List<AssetEntity> media =
+          await albums[0].getAssetListPaged(page: 0, size: 100);
+      setState(() {
+        images = media;
+        isLoading = false;
+      });
+    }
+  }
 
   AppBar buildAppBar(BuildContext context) {
     return AppBar(
@@ -19,7 +75,8 @@ class PostScreen extends StatelessWidget {
       actions: [
         TextButton(
             onPressed: () {
-              Navigator.push(context,MaterialPageRoute(builder: (ctx)=>FilterScreen()));
+              Navigator.push(
+                  context, MaterialPageRoute(builder: (ctx) => FilterScreen()));
             },
             child: Text(
               "Next",
@@ -42,6 +99,9 @@ class PostScreen extends StatelessWidget {
               child: Container(
                 height: 200,
                 width: 350,
+                child: selectedImage != null
+                    ? Image.memory(selectedImage!, fit: BoxFit.cover)
+                    : Center(child: Text('Select an image')),
                 color: Colors.grey[400],
               ),
             ),
@@ -143,21 +203,27 @@ class PostScreen extends StatelessWidget {
                   childAspectRatio: 1.0,
                 ),
                 itemBuilder: (context, index) {
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: kGry, // Applying your color
-                      // borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Center(
-                      child: Text(
-                        'Item ${index + 1}',
-                        style: TextStyle(
-                            color: kBlack, fontWeight: FontWeight.bold),
-                      ),
-                    ),
+                  return FutureBuilder<Uint8List?>(
+                    future: Future.value(images[index]
+                        .thumbnailDataWithSize(ThumbnailSize(200, 200))),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Container(color: Colors.grey[300]);
+                      }
+                      if (snapshot.hasData) {
+                        return GestureDetector(
+                          onTap: () =>
+                              selectImage(images[index]), // Select image
+                          child:
+                              Image.memory(snapshot.data!, fit: BoxFit.cover),
+                        );
+                      } else {
+                        return Container(color: Colors.grey[300]);
+                      }
+                    },
                   );
                 },
-                itemCount: 20,
+                itemCount: images.isNotEmpty ? images.length : 0,
               ),
             ),
             Gap(10),
@@ -206,6 +272,4 @@ class PostScreen extends StatelessWidget {
       ),
     );
   }
-
-  
 }

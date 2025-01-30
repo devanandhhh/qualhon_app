@@ -14,7 +14,6 @@ class MyApp extends StatelessWidget {
       title: 'Qualhon App',
       debugShowCheckedModeBanner: false,
       home: FirstScreen(),
-      
     );
   }
 }
